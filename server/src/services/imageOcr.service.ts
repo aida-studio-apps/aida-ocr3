@@ -1,5 +1,5 @@
 import { createWorker } from 'tesseract.js';
-import type { OcrLanguage, OcrPageResult } from '../types/ocr.types';
+import type { OcrLanguage, OcrPageResult } from '../types/ocr.types.js';
 
 export async function extractTextFromImageBuffer(
   buffer: Buffer,

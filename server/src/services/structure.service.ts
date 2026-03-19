@@ -1,4 +1,4 @@
-import type { StructuredBlock } from '../types/ocr.types';
+import type { StructuredBlock } from '../types/ocr.types.js';
 
 export function structureText(rawText: string): StructuredBlock[] {
   const lines = rawText

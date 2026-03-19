@@ -1,7 +1,7 @@
-import type { OcrExtractResponse, OcrLanguage, OcrPageResult } from '../types/ocr.types';
-import { extractTextFromImageBuffer } from './imageOcr.service';
-import { extractTextFromPdfBuffer } from './pdfOcr.service';
-import { structureText } from './structure.service';
+import type { OcrExtractResponse, OcrLanguage, OcrPageResult } from '../types/ocr.types.js';
+import { extractTextFromImageBuffer } from './imageOcr.service.js';
+import { extractTextFromPdfBuffer } from './pdfOcr.service.js';
+import { structureText } from './structure.service.js';
 
 export async function runOcr(params: {
   file: { mimetype: string; buffer: Buffer };

@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 type MulterFile = { mimetype: string; buffer: Buffer };
-import { ocrBodySchema } from '../validators/ocr.validator';
-import { runOcr } from '../services/ocr.service';
+import { ocrBodySchema } from '../validators/ocr.validator.js';
+import { runOcr } from '../services/ocr.service.js';
 
 type OcrRequest = Request & { file?: MulterFile };
 
