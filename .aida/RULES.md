@@ -1,64 +1,60 @@
 # Conventions de code — Projet OCR fullstack
 
-## 1. Principes généraux
-- TypeScript strict partout (frontend + backend).
-- Lisibilité et simplicité d’abord, pas de sur‑ingénierie.
-- Une responsabilité par fichier/service/composant.
-- Aucun `any` autorisé.
+## 1) Principes généraux
+- TypeScript strict partout (client + server).
+- Lisibilité prioritaire, fonctions courtes, responsabilités claires.
+- Aucun `any` (utiliser `unknown` + narrowing si nécessaire).
+- Pas de logique métier dans les composants UI : la logique va dans hooks/services.
 
-## 2. Nommage
-- Composants React: `PascalCase` (ex: `ExtractionResult.tsx`).
-- Hooks: `useCamelCase` (ex: `useExtraction.ts`).
-- Fonctions/variables: `camelCase`.
-- Constantes globales: `UPPER_SNAKE_CASE`.
-- Fichiers backend service/controller/middleware: suffixes explicites:
-  - `*.service.ts`, `*.controller.ts`, `*.middleware.ts`, `*.validator.ts`.
+## 2) Nommage
+- Composants React : **PascalCase** (`FileDropzone.tsx`).
+- Hooks : préfixe `use` en **camelCase** (`useOcrExtraction.ts`).
+- Fonctions/variables : **camelCase**.
+- Constantes globales : **UPPER_SNAKE_CASE**.
+- Fichiers backend service/controller : suffixes explicites (`ocr.service.ts`, `ocr.controller.ts`).
 
-## 3. Exports
-- Composants React: `export default`.
-- Utilitaires, hooks, services backend/frontend: exports nommés.
-- Types/interfaces: exports nommés uniquement.
+## 3) Exports
+- Composants React : `export default`.
+- Utilitaires, services, types : **exports nommés**.
+- Un fichier `types` n’exporte que des types/interfaces.
 
-## 4. Imports (ordre obligatoire)
+## 4) Imports (ordre obligatoire)
 1. React / Node built-ins
 2. Librairies tierces
-3. Imports internes absolus/alias (si configurés)
-4. Imports relatifs locaux
-5. Types `type` imports séparés si possible
+3. Imports internes absolus/relatifs (components, hooks, services, utils)
+4. Types (`import type ...`)
+5. Styles
 
-## 5. Style React
-- Composants fonctionnels en arrow functions.
-- Props toujours typées.
-- Pas de logique métier lourde dans JSX: déplacer vers hooks/utils.
-- UI en Tailwind prioritairement, sobre et professionnelle.
-- Éviter la duplication: extraire composants réutilisables.
+Séparer chaque groupe par une ligne vide.
 
-## 6. Gestion d’état frontend
-- `useState` pour état local simple.
-- `useMemo`/`useCallback` uniquement si utile (pas systématique).
-- Appels API centralisés dans `services/`.
-- Aucune mutation directe d’objet d’état.
+## 5) Frontend (React)
+- Composants en arrow function.
+- Props typées explicitement (interface `...Props`).
+- État local via hooks; éviter prop drilling profond (max 2-3 niveaux).
+- UI sobre: Tailwind utilitaire uniquement, pas de CSS custom sauf nécessité réelle.
+- Gestion erreurs utilisateur via toast (`sonner`) + composant `ErrorAlert`.
 
-## 7. API & backend
+## 6) Backend (Express)
+- Controllers minces, services riches.
 - Validation d’entrée systématique via `zod` avant logique métier.
-- Controllers minces, logique dans `services`.
-- Middleware d’erreurs global unique.
-- Réponses API homogènes:
-  - succès: `{ success: true, data }`
-  - erreur: `{ success: false, error }`
+- `try/catch` au niveau controller/service critique, erreurs métier avec classes dédiées.
+- Réponses API JSON homogènes:
+  - succès: `{ data, meta? }`
+  - erreur: `{ error: { code, message, details? } }`
+- Logging structuré via `pino-http`, sans données sensibles.
 
-## 8. Gestion d’erreurs
-- Backend: `try/catch` dans controllers/services critiques + logs structurés.
-- Frontend: afficher messages utilisateur explicites (composant d’alerte).
-- Ne jamais exposer une stack technique brute côté client.
+## 7) OCR & fichiers
+- Vérifier MIME type + extension + taille max avant traitement.
+- Nettoyer tous les fichiers temporaires en `finally`.
+- Si confiance OCR faible, renvoyer un warning explicite.
 
-## 9. Upload et fichiers
-- Valider type MIME + extension + taille max.
-- Nettoyer tous les fichiers temporaires après traitement (succès/échec).
-- Refuser tout fichier hors whitelist (jpg, jpeg, png, pdf).
+## 8) Qualité
+- ESLint/Prettier du template respectés strictement.
+- Fonctions > 40 lignes à refactorer si possible.
+- Commentaires seulement pour expliquer un "pourquoi", pas le "quoi" évident.
 
-## 10. Qualité & formatting
-- Fonctions courtes, noms explicites.
-- Commentaires seulement pour expliquer le “pourquoi”, pas le “quoi” évident.
-- Conserver une structure de dossier stable et prévisible.
+## 9) Tests manuels minimaux (MVP)
+- Upload image lisible → texte fidèle.
+- Upload PDF scanné multi-pages → extraction toutes pages.
+- Document difficile → résultat partiel + warning, sans crash.
 
