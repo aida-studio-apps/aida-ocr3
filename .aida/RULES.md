@@ -1,60 +1,62 @@
-# Conventions de code — Projet OCR fullstack
+# Conventions de code — Projet OCR Fullstack
 
 ## 1) Principes généraux
 - TypeScript strict partout (client + server).
-- Lisibilité prioritaire, fonctions courtes, responsabilités claires.
-- Aucun `any` (utiliser `unknown` + narrowing si nécessaire).
-- Pas de logique métier dans les composants UI : la logique va dans hooks/services.
+- Lisibilité et simplicité avant abstraction prématurée.
+- Aucune utilisation de `any`.
+- Fonctions courtes, responsabilité unique.
 
 ## 2) Nommage
-- Composants React : **PascalCase** (`FileDropzone.tsx`).
-- Hooks : préfixe `use` en **camelCase** (`useOcrExtraction.ts`).
-- Fonctions/variables : **camelCase**.
-- Constantes globales : **UPPER_SNAKE_CASE**.
-- Fichiers backend service/controller : suffixes explicites (`ocr.service.ts`, `ocr.controller.ts`).
+- **Composants React**: `PascalCase` (ex: `ExtractionResult`).
+- **Hooks**: préfixe `use` (ex: `useOcrExtraction`).
+- **Fonctions/variables**: `camelCase`.
+- **Constantes globales**: `UPPER_SNAKE_CASE`.
+- **Fichiers**:
+  - Composants: `PascalCase.tsx`
+  - Services/Utils/Middleware: `kebab-case` ou suffixés `.service.ts`, `.middleware.ts`, `.validator.ts`
 
 ## 3) Exports
-- Composants React : `export default`.
-- Utilitaires, services, types : **exports nommés**.
-- Un fichier `types` n’exporte que des types/interfaces.
+- **Composants de page/composants UI**: `export default`.
+- **Utils/services/types**: exports nommés.
+- Éviter les exports mixtes dans un même fichier.
 
 ## 4) Imports (ordre obligatoire)
-1. React / Node built-ins
+1. React
 2. Librairies tierces
-3. Imports internes absolus/relatifs (components, hooks, services, utils)
-4. Types (`import type ...`)
-5. Styles
+3. Aliases internes (si configurés)
+4. Imports relatifs locaux
+5. Types (`import type`) séparés quand pertinent
+6. Styles en dernier
 
-Séparer chaque groupe par une ligne vide.
+## 5) React
+- Composants sous forme de fonctions fléchées.
+- Props typées explicitement.
+- Éviter la logique métier dans JSX; la déplacer dans hooks/services.
+- UI sobre: Tailwind utilitaire uniquement, pas de CSS custom sauf nécessité claire.
 
-## 5) Frontend (React)
-- Composants en arrow function.
-- Props typées explicitement (interface `...Props`).
-- État local via hooks; éviter prop drilling profond (max 2-3 niveaux).
-- UI sobre: Tailwind utilitaire uniquement, pas de CSS custom sauf nécessité réelle.
-- Gestion erreurs utilisateur via toast (`sonner`) + composant `ErrorAlert`.
+## 6) API & Backend
+- Validation d’entrée systématique via `zod`.
+- Contrôleurs minces, logique dans `services`.
+- Middleware d’erreur centralisé, format d’erreur homogène.
+- Ne jamais exposer de stack trace brute au client.
 
-## 6) Backend (Express)
-- Controllers minces, services riches.
-- Validation d’entrée systématique via `zod` avant logique métier.
-- `try/catch` au niveau controller/service critique, erreurs métier avec classes dédiées.
-- Réponses API JSON homogènes:
-  - succès: `{ data, meta? }`
-  - erreur: `{ error: { code, message, details? } }`
-- Logging structuré via `pino-http`, sans données sensibles.
+## 7) Gestion d’erreurs
+- `try/catch` sur toutes les opérations I/O (upload, OCR, parsing PDF).
+- Messages utilisateur clairs côté frontend.
+- Logs techniques côté serveur avec contexte minimal (route, fichier, durée).
 
-## 7) OCR & fichiers
-- Vérifier MIME type + extension + taille max avant traitement.
-- Nettoyer tous les fichiers temporaires en `finally`.
-- Si confiance OCR faible, renvoyer un warning explicite.
+## 8) Types et modèles
+- Types partagés regroupés dans `types/`.
+- Toute réponse API doit avoir une interface dédiée.
+- Les champs optionnels doivent être justifiés.
 
-## 8) Qualité
-- ESLint/Prettier du template respectés strictement.
-- Fonctions > 40 lignes à refactorer si possible.
-- Commentaires seulement pour expliquer un "pourquoi", pas le "quoi" évident.
+## 9) Qualité
+- Garder des fonctions pures pour le post-traitement texte quand possible.
+- Pas de code mort, pas de commentaires inutiles.
+- Une seule responsabilité par fichier autant que possible.
 
-## 9) Tests manuels minimaux (MVP)
-- Upload image lisible → texte fidèle.
-- Upload PDF scanné multi-pages → extraction toutes pages.
-- Document difficile → résultat partiel + warning, sans crash.
+## 10) Sécurité & robustesse
+- Limiter taille et types MIME des uploads.
+- Supprimer systématiquement les fichiers temporaires.
+- Refuser toute extension non supportée.
 

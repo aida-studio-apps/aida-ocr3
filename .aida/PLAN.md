@@ -1,176 +1,137 @@
-# Plan d’implémentation — Application OCR (Image/PDF scannés → Texte structuré)
+# Plan d’implémentation — Application d’extraction OCR (image + PDF scanné)
 
 ## 1. Stack technique
 
 ### Template choisi
 - **Template : `express-fullstack`**
-- **Justification :**
-  - Le besoin inclut **upload de fichiers** (images + PDF scannés).
-  - Nécessite du **processing serveur** (OCR priorisant la qualité, potentiellement long).
-  - Nécessite une **API REST** (`/api/ocr/extract`) pour orchestrer upload, conversion PDF→images, OCR multi-pages et réponse structurée.
-  - Une SPA front seule (`vite-react-tailwind`) est insuffisante pour ce traitement robuste.
+- **Justification :** le besoin impose un **backend** pour traiter des uploads de fichiers (images/PDF), faire de l’OCR potentiellement long, et retourner un texte structuré. Un template SPA statique n’est pas adapté.
 
-### Stack détaillée
-- **Frontend** : React + TypeScript + Vite + Tailwind (template fullstack)
-- **Backend** : Express + TypeScript
-- **OCR** : `tesseract.js` (mode serveur worker)
-- **PDF rendu image** : `pdfjs-dist` + `canvas` (rasterisation page par page)
-- **Upload** : `multer`
-- **Validation requêtes** : `zod`
-- **Logs** : `pino` + `pino-http`
-- **Utilitaires** : `mime-types`, `nanoid`
+### Stack cible
+- **Frontend :** React + TypeScript + Tailwind (client Vite)
+- **Backend :** Express + TypeScript
+- **OCR :** `tesseract.js` (OCR multi-format) avec paramètres orientés qualité
+- **Parsing PDF scanné :** `pdfjs-dist` côté serveur pour rasteriser les pages PDF en images avant OCR
+- **Upload :** `multer` (multipart/form-data)
+- **Validation :** `zod`
+- **HTTP client front :** `axios`
+- **UI utilitaire :** `lucide-react`
 
-### Dépendances supplémentaires à prévoir
+### Dépendances supplémentaires à installer (prévision)
 - Backend:
-  - `tesseract.js`
   - `multer`
-  - `zod`
+  - `tesseract.js`
   - `pdfjs-dist`
-  - `canvas`
-  - `pino` `pino-http`
-  - `mime-types`
-  - `nanoid`
+  - `canvas` (rendu image côté Node pour PDF)
+  - `zod`
+  - `pino` ou `morgan` (logs)
 - Frontend:
-  - `react-dropzone` (UX upload)
-  - `lucide-react` (icônes)
-  - `sonner` (notifications)
+  - `axios`
+  - `react-dropzone`
+  - `lucide-react`
 
 ---
 
-## 2. Arborescence des fichiers (exhaustive)
+## 2. Arborescence des fichiers
 
 ```text
 /workspace/
 ├── client/
 │   ├── src/
-│   │   ├── app/
-│   │   │   └── providers.tsx
 │   │   ├── components/
-│   │   │   ├── layout/
-│   │   │   │   ├── AppShell.tsx
-│   │   │   │   └── Header.tsx
-│   │   │   ├── upload/
-│   │   │   │   ├── FileDropzone.tsx
-│   │   │   │   ├── FileMetaCard.tsx
-│   │   │   │   └── ExtractionControls.tsx
-│   │   │   ├── extraction/
-│   │   │   │   ├── ExtractionProgress.tsx
-│   │   │   │   ├── ExtractedTextView.tsx
-│   │   │   │   └── PageTextBlock.tsx
-│   │   │   └── common/
-│   │   │       ├── EmptyState.tsx
-│   │   │       ├── ErrorAlert.tsx
-│   │   │       └── Spinner.tsx
+│   │   │   ├── Layout.tsx                    # Conteneur principal sobre/professionnel
+│   │   │   ├── FileDropzone.tsx              # Zone d’upload image/PDF + validations UI
+│   │   │   ├── ExtractionControls.tsx        # Bouton lancer extraction + options langue
+│   │   │   ├── ProgressPanel.tsx             # Affichage progression OCR
+│   │   │   ├── ExtractionResult.tsx          # Rendu texte extrait (paragraphes/titres approx.)
+│   │   │   ├── ErrorAlert.tsx                # Affichage d’erreur utilisateur
+│   │   │   └── DocumentPreview.tsx           # Aperçu simple du fichier importé
 │   │   ├── pages/
-│   │   │   └── HomePage.tsx
+│   │   │   └── HomePage.tsx                  # Vue unique: upload -> extraction -> résultat
 │   │   ├── services/
-│   │   │   └── ocrApi.ts
-│   │   ├── hooks/
-│   │   │   ├── useFileUpload.ts
-│   │   │   └── useOcrExtraction.ts
+│   │   │   └── ocrApi.ts                     # Appels API vers /api/ocr/extract
 │   │   ├── types/
-│   │   │   ├── ocr.ts
-│   │   │   └── api.ts
+│   │   │   └── index.ts                      # Types front partagés
+│   │   ├── hooks/
+│   │   │   └── useOcrExtraction.ts           # Orchestration état d’extraction
 │   │   ├── utils/
-│   │   │   ├── format.ts
-│   │   │   ├── fileValidation.ts
-│   │   │   └── textStructure.ts
-│   │   ├── App.tsx
-│   │   └── main.tsx
-│   └── ...
+│   │   │   ├── fileValidation.ts             # Validation type/taille fichiers
+│   │   │   └── textFormatting.ts             # Post-traitement affichage paragraphes/titres
+│   │   ├── App.tsx                           # Composition principale
+│   │   └── main.tsx                          # Entry point
 ├── server/
 │   ├── src/
-│   │   ├── app.ts
-│   │   ├── server.ts
-│   │   ├── config/
-│   │   │   └── env.ts
 │   │   ├── routes/
-│   │   │   ├── index.ts
-│   │   │   └── ocr.routes.ts
+│   │   │   └── ocr.routes.ts                 # Endpoint OCR
 │   │   ├── controllers/
-│   │   │   └── ocr.controller.ts
+│   │   │   └── ocr.controller.ts             # Gestion requête/réponse OCR
 │   │   ├── services/
-│   │   │   ├── ocr/
-│   │   │   │   ├── ocr.service.ts
-│   │   │   │   ├── tesseract.worker.ts
-│   │   │   │   └── structurePostProcessor.ts
-│   │   │   ├── pdf/
-│   │   │   │   └── pdfRasterizer.service.ts
-│   │   │   └── files/
-│   │   │       ├── fileType.service.ts
-│   │   │       └── uploadCleanup.service.ts
-│   │   ├── middlewares/
-│   │   │   ├── errorHandler.ts
-│   │   │   ├── notFound.ts
-│   │   │   ├── upload.middleware.ts
-│   │   │   └── requestLogger.ts
-│   │   ├── schemas/
-│   │   │   └── ocr.schema.ts
+│   │   │   ├── ocr.service.ts                # Pipeline OCR global
+│   │   │   ├── imageOcr.service.ts           # OCR sur image
+│   │   │   ├── pdfOcr.service.ts             # OCR PDF page par page
+│   │   │   └── structure.service.ts          # Heuristiques paragraphes/titres
+│   │   ├── middleware/
+│   │   │   ├── upload.middleware.ts          # Config multer (types, taille)
+│   │   │   └── error.middleware.ts           # Gestion centralisée des erreurs
+│   │   ├── validators/
+│   │   │   └── ocr.validator.ts              # Validation d’inputs via zod
 │   │   ├── types/
-│   │   │   ├── api.ts
-│   │   │   └── ocr.ts
-│   │   └── utils/
-│   │       ├── asyncHandler.ts
-│   │       ├── errors.ts
-│   │       └── timers.ts
-│   └── ...
-└── references/
-    ├── po_goindigo.pdf
-    └── Image.jpeg
+│   │   │   └── ocr.types.ts                  # Types backend OCR
+│   │   ├── utils/
+│   │   │   ├── logger.ts                     # Logging applicatif
+│   │   │   └── tempFiles.ts                  # Gestion fichiers temporaires
+│   │   └── app.ts                            # Enregistrement routes/middlewares
+└── /workspace/.aida/
+    ├── PLAN.md
+    └── RULES.md
 ```
-
-### Description rapide de chaque fichier clé
-- `HomePage.tsx` : page unique orientée workflow upload → extraction → consultation.
-- `FileDropzone.tsx` : zone d’import drag&drop + sélection fichier.
-- `ExtractionControls.tsx` : bouton lancer extraction, reset.
-- `ExtractedTextView.tsx` : affichage texte global, structuré en blocs.
-- `PageTextBlock.tsx` : rendu d’une page OCR (titre/paragraphes approximés).
-- `ocrApi.ts` : client HTTP vers endpoint backend.
-- `useOcrExtraction.ts` : orchestration état extraction (idle/loading/success/error).
-- `ocr.controller.ts` : reçoit upload, appelle pipeline OCR.
-- `ocr.service.ts` : logique métier principale OCR image/PDF.
-- `pdfRasterizer.service.ts` : conversion PDF scanné en images exploitables OCR.
-- `structurePostProcessor.ts` : heuristiques de reconstruction titres/paragraphes.
-- `upload.middleware.ts` : config multer (types/taille autorisés).
-- `ocr.schema.ts` : validation des options requête.
 
 ---
 
-## 3. Modèles de données (TypeScript)
+## 3. Modèles de données
 
 ```ts
-interface UploadedFileMeta {
+interface UploadedDocument {
   originalName: string;
-  mimeType: 'image/jpeg' | 'image/png' | 'application/pdf';
-  sizeBytes: number;
+  mimeType: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp';
+  size: number;
+  tempPath: string;
 }
 
-interface OcrRequestOptions {
+interface OcrExtractRequest {
   language: 'fra' | 'eng' | 'fra+eng';
   preserveLayout: boolean;
 }
 
 interface OcrPageResult {
   pageNumber: number;
-  rawText: string;
-  structuredText: string;
-  confidenceMean: number;
+  text: string;
+  confidence?: number;
 }
 
-interface OcrResult {
-  documentId: string;
-  fileName: string;
-  fileType: 'image' | 'pdf';
-  pages: OcrPageResult[];
+interface StructuredBlock {
+  type: 'title' | 'paragraph';
+  content: string;
+}
+
+interface OcrExtractResponse {
   fullText: string;
+  blocks: StructuredBlock[];
+  pages: OcrPageResult[];
   processingTimeMs: number;
   warnings: string[];
 }
 
 interface ApiErrorResponse {
-  code: string;
   message: string;
-  details?: Record<string, unknown>;
+  code: string;
+  details?: string[];
+}
+
+interface ExtractionState {
+  status: 'idle' | 'validating' | 'uploading' | 'processing' | 'success' | 'error';
+  progress: number;
+  result: OcrExtractResponse | null;
+  errorMessage: string | null;
 }
 ```
 
@@ -178,133 +139,116 @@ interface ApiErrorResponse {
 
 ## 4. Architecture des composants
 
-- `App` → `AppShell` → `HomePage`
-- `HomePage` compose:
-  - `FileDropzone` (input fichier)
-  - `FileMetaCard` (nom, type, taille)
-  - `ExtractionControls` (démarrer / réinitialiser)
-  - `ExtractionProgress` (état en cours)
-  - `ErrorAlert` (erreurs)
-  - `ExtractedTextView`
-    - `PageTextBlock` (par page)
-- Composants réutilisables UI:
-  - `Spinner`, `EmptyState`
-
-Flux principal:
-1. Sélection fichier
-2. Validation locale
-3. Envoi backend
-4. Affichage progression
-5. Rendu résultat structuré
+- `App` → monte `HomePage`.
+- `HomePage` orchestre:
+  - `FileDropzone` (sélection fichier)
+  - `ExtractionControls` (langue + lancement)
+  - `ProgressPanel` (état OCR)
+  - `ErrorAlert` (si erreur)
+  - `DocumentPreview` (avant extraction)
+  - `ExtractionResult` (après succès)
+- Hook `useOcrExtraction` centralise la logique (submit, progression, reset, gestion erreurs).
+- Services API (`ocrApi.ts`) isolent la couche HTTP.
 
 ---
 
 ## 5. Gestion d’état
 
-- **Local state (useState/useReducer)** sur `HomePage` via hook `useOcrExtraction`:
-  - `selectedFile`
-  - `status` (`idle|validating|uploading|processing|success|error`)
-  - `result`
-  - `error`
-- Pas de Context global nécessaire (application mono-page, mono-utilisateur).
-- Pas de persistance locale obligatoire (priorité extraction ponctuelle).
+- **Local state avec `useState` + hook custom** (`useOcrExtraction`) suffisant (application mono-utilisateur, une seule vue).
+- Pas de Redux/Context global nécessaire.
+- Pas de persistance obligatoire (pas d’édition, pas d’historique demandé).
+- Optionnel: mémoriser dernière langue choisie en `localStorage`.
 
 ---
 
 ## 6. Routing
 
-Application simple :
+Application à vue unique:
 - `/` → `HomePage`
 
-Aucune route additionnelle requise au MVP.
+(Pas de router requis si une seule page ; peut rester sans `react-router-dom`.)
 
 ---
 
 ## 7. API Design (backend)
 
 ### `POST /api/ocr/extract`
-- **But** : uploader image/pdf scanné et lancer OCR
-- **Content-Type** : `multipart/form-data`
-- **Body** :
-  - `file` (obligatoire)
-  - `language` (optionnel, défaut `fra`)
-  - `preserveLayout` (optionnel, défaut `true`)
-- **Response 200** : `OcrResult`
-- **Erreurs** :
-  - `400` fichier invalide / option invalide
+- **Content-Type :** `multipart/form-data`
+- **Body :**
+  - `file`: image/PDF scanné
+  - `language`: `fra | eng | fra+eng`
+  - `preserveLayout`: `true | false`
+- **Response 200 :** `OcrExtractResponse`
+- **Erreurs :**
+  - `400` fichier invalide / paramètres invalides
   - `413` fichier trop volumineux
-  - `422` OCR impossible (document illisible)
-  - `500` erreur interne
+  - `415` type non supporté
+  - `500` erreur OCR interne
 
 ### `GET /api/health`
-- Healthcheck service.
+- Vérification disponibilité backend.
 
 ---
 
 ## 8. Parties complexes et solutions prévues
 
-1. **OCR de PDF scannés multi-pages**
-   - Solution : rasteriser chaque page PDF (`pdfjs-dist` + `canvas`) en image haute résolution puis OCR page par page.
+1. **OCR fidèle mais potentiellement lent**
+   - Prioriser qualité via config Tesseract (PSM adaptés, langue(s) combinées).
+   - Afficher progression côté UI pour UX acceptable.
 
-2. **Qualité d’extraction prioritaire**
-   - Solution : config OCR orientée précision (dpi/rendu plus élevé, pipeline plus lent accepté), traitement séquentiel des pages pour stabilité mémoire.
+2. **PDF scanné multi-pages**
+   - Convertir chaque page en image (pdfjs + canvas) puis OCR page par page.
+   - Concaténer proprement les pages, conserver séparateurs.
 
-3. **Conservation approximative des titres/paragraphes**
-   - Solution : post-traitement heuristique:
-     - segmentation par blocs/retours ligne,
-     - détection titres via longueur, casse, ponctuation,
-     - reconstruction paragraphes par concaténation des lignes proches.
+3. **Conservation approximative paragraphes/titres**
+   - Heuristiques post-OCR:
+     - lignes courtes en capitales / taille relative → `title`
+     - regroupement de lignes proches → `paragraph`
+   - Retour structuré `blocks[]` en plus du `fullText`.
 
-4. **Gestion documents difficiles (faible contraste/bruit)**
-   - Solution : prétraitement image serveur léger (grayscale/contrast) avant OCR; warnings de confiance basse dans la réponse.
+4. **Documents de qualité moyenne (bruit/flou)**
+   - Prétraitement léger image (niveaux de gris/contraste si faisable dans pipeline serveur).
+   - Retourner avertissements si confiance faible.
 
-5. **Nettoyage fichiers temporaires**
-   - Solution : suppression systématique après traitement (finally), y compris en cas d’erreur.
+5. **Gestion mémoire/temporaires**
+   - Stockage temporaire contrôlé, suppression systématique après traitement.
 
 ---
 
-## 9. Dépendances à installer (prévision)
+## 9. Dépendances à installer
 
 ```bash
 # backend
-npm install tesseract.js multer zod pdfjs-dist canvas pino pino-http mime-types nanoid
+npm install multer tesseract.js pdfjs-dist canvas zod pino
 
 # frontend
-npm install react-dropzone lucide-react sonner
+npm install axios react-dropzone lucide-react
 ```
+
+(Le Principal Agent ajustera selon compatibilité exacte du template.)
 
 ---
 
 ## 10. Ordre d’implémentation recommandé
 
-1. `server/src/types/ocr.ts`, `server/src/types/api.ts`
-2. `server/src/config/env.ts`, `server/src/utils/errors.ts`, `server/src/utils/asyncHandler.ts`
-3. `server/src/middlewares/requestLogger.ts`, `upload.middleware.ts`, `errorHandler.ts`, `notFound.ts`
-4. `server/src/schemas/ocr.schema.ts`
-5. `server/src/services/files/fileType.service.ts`, `uploadCleanup.service.ts`
-6. `server/src/services/pdf/pdfRasterizer.service.ts`
-7. `server/src/services/ocr/tesseract.worker.ts`
-8. `server/src/services/ocr/structurePostProcessor.ts`
-9. `server/src/services/ocr/ocr.service.ts`
-10. `server/src/controllers/ocr.controller.ts`
-11. `server/src/routes/ocr.routes.ts`, `server/src/routes/index.ts`
-12. `server/src/app.ts`, `server/src/server.ts`
-13. `client/src/types/ocr.ts`, `client/src/types/api.ts`
-14. `client/src/utils/fileValidation.ts`, `format.ts`, `textStructure.ts`
-15. `client/src/services/ocrApi.ts`
-16. `client/src/hooks/useFileUpload.ts`, `useOcrExtraction.ts`
-17. `client/src/components/common/*`
-18. `client/src/components/upload/*`
-19. `client/src/components/extraction/*`
-20. `client/src/components/layout/*`
-21. `client/src/pages/HomePage.tsx`
-22. `client/src/app/providers.tsx`, `client/src/App.tsx`, `client/src/main.tsx`
-23. Tests manuels avec `references/po_goindigo.pdf` et `references/Image.jpeg`.
+1. **Types backend/front** (`server/src/types/ocr.types.ts`, `client/src/types/index.ts`)
+2. **Validation & upload middleware** (`ocr.validator.ts`, `upload.middleware.ts`)
+3. **Services OCR bas niveau** (`imageOcr.service.ts`, `pdfOcr.service.ts`)
+4. **Service structuration texte** (`structure.service.ts`)
+5. **Service orchestration OCR** (`ocr.service.ts`)
+6. **Controller + route API** (`ocr.controller.ts`, `ocr.routes.ts`)
+7. **Gestion erreurs/logs** (`error.middleware.ts`, `logger.ts`, `tempFiles.ts`)
+8. **Service API frontend** (`client/src/services/ocrApi.ts`)
+9. **Hook d’orchestration UI** (`useOcrExtraction.ts`)
+10. **Composants UI atomiques** (`ErrorAlert`, `ProgressPanel`, `ExtractionControls`)
+11. **Composants upload/résultat** (`FileDropzone`, `DocumentPreview`, `ExtractionResult`)
+12. **Page + composition finale** (`HomePage.tsx`, `App.tsx`)
+13. **Tests manuels avec fichiers fournis** (PDF + JPEG uploadés)
 
 ---
 
-## 11. Analyse des fichiers de référence (constats utiles)
+## Analyse des fichiers de référence uploadés
 
-- `po_goindigo.pdf` : PDF contenant principalement des objets image (scan), cohérent avec besoin OCR document scanné.
-- `Image.jpeg` : image JPEG haute résolution (scan photo), utile pour test OCR image.
-- Conclusion : les fichiers fournis correspondent exactement au périmètre MVP (image + PDF scannés).
+- `po_goindigo.pdf`: PDF scanné (présence d’objets image dans la structure) → confirme la nécessité d’un pipeline OCR image/page.
+- `Image.jpeg`: image JPEG volumineuse avec métadonnées EXIF → confirme support image haute résolution.
+- Les deux fichiers servent de base pour les scénarios de test fournis (lisible + réaliste).
