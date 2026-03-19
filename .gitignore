@@ -5,3 +5,16 @@ dist/
 *.pyc
 .env
 .DS_Store
+build/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.turbo/
+coverage/
+references/
+*.tgz
+*.tar.gz
+.env.local
+.env.*.local
+Thumbs.db

@@ -1,0 +1,36 @@
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { createCanvas } from 'canvas';
+import { createWorker } from 'tesseract.js';
+export async function extractTextFromPdfBuffer(buffer, language) {
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+    const pdf = await loadingTask.promise;
+    const worker = await createWorker(language);
+    await worker.setParameters({
+        preserve_interword_spaces: '1',
+    });
+    const pages = [];
+    try {
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 2.0 });
+            const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+            const context = canvas.getContext('2d');
+            await page.render({
+                canvas: canvas,
+                canvasContext: context,
+                viewport,
+            }).promise;
+            const imageBuffer = canvas.toBuffer('image/png');
+            const result = await worker.recognize(imageBuffer);
+            pages.push({
+                pageNumber: pageNum,
+                text: result.data.text ?? '',
+                confidence: result.data.confidence,
+            });
+        }
+    }
+    finally {
+        await worker.terminate();
+    }
+    return pages;
+}
